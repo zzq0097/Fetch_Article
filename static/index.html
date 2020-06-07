@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Text</title>
+
+    <script src="./jquery.min.js"></script>
+    <!--  wangEditor  -->
+    <script src="./wangEditor.min.js"></script>
+    <!-- Vue + Element UI -->
+    <link rel="stylesheet" href="https://unpkg.com/element-ui/lib/theme-chalk/index.css">
+    <script src="https://cdn.jsdelivr.net/npm/vue"></script>
+    <script src="https://unpkg.com/element-ui/lib/index.js"></script>
+
+    <style>
+        #left{
+            width: 50%;
+            float: left;
+        }
+        #right{
+            width: 50%;
+            float: right;
+        }
+        .el-card__body{
+            padding: 10px;
+        }
+        .toolbar,.text{
+            box-shadow: 0 2px 4px rgba(0, 0, 0, .12), 0 0 6px rgba(0, 0, 0, .04)
+        }
+        .text{
+            height: 700px;
+        }
+    </style>
+
+</head>
+<body>
+
+<!--    <div id="login" v-if="">-->
+<!--        -->
+<!--    </div>-->
+
+    <div id="left">
+        <div id="header">
+            <p>
+                文章地址：
+                <el-input v-model="url" @blur="crawlArt" clearable></el-input>
+            </p>
+            <p>
+                前置副标题：
+                <el-input v-model="preTitle" clearable></el-input>
+            </p>
+            <p>
+                标题：
+                <el-input v-model="title" clearable></el-input>
+            </p>
+            <p>
+                后置副标题：
+                <el-input v-model="afterTitle" clearable></el-input>
+            </p>
+            <p>
+                摘要：
+                <el-input v-model="summary" type="textarea" :autosize="{minRows: 2,maxRows: 10}"
+                          maxlength="1500" show-word-limit></el-input>
+            </p>
+        </div>
+
+        正文： --> 在此修改 --> 重新预览
+        <div id="toolbar" class="toolbar">
+            <!-- 工具栏 -->
+        </div>
+        <div id="text" class="text">
+            <!-- 文本框 -->
+        </div>
+
+        <div id="footer">
+            <p>
+                注释：
+                <el-input v-model="remarks" type="textarea" :autosize="{minRows: 2,maxRows: 10}"
+                            maxlength="1500" show-word-limit></el-input>
+            </p>
+            <p style="height: 1px"></p>
+            <el-divider><el-button @click="previewArt" type="primary">预览</el-button></el-divider>
+            <p style="height: 1px"></p>
+            <el-divider>纯文本预览</el-divider>
+            <el-input type="textarea" v-model="Art" :autosize="{minRows: 5,maxRows: 500}"></el-input>
+        </div>
+    </div>
+
+    <div id="right">
+<!--        <el-divider>文章地址</el-divider>-->
+<!--        <el-card>{{ header.url }}</el-card>-->
+<!--        <el-divider>前置副标题</el-divider>-->
+<!--        <el-card>{{ header.preTitle }}</el-card>-->
+<!--        <el-divider>标题</el-divider>-->
+<!--        <el-card>{{ header.title }}</el-card>-->
+<!--        <el-divider>后置副标题</el-divider>-->
+<!--        <el-card>{{ header.afterTitle }}</el-card>-->
+<!--        <el-divider>摘要</el-divider>-->
+<!--        <el-card>{{ header.summary }}</el-card>-->
+        <el-divider>正文预览</el-divider>
+
+        <div v-for="line in contentLine">
+            <!-- 图片路径 serverIP -->
+            <img v-if="line.includes('127.0.0.1')" :src="line" />
+            <el-card v-else>{{ line }}</el-card>
+        </div>
+        <el-divider v-if="showSubmit"><el-button @click="submitArt" type="success">提交</el-button></el-divider>
+    </div>
+
+<script>
+
+    var serverURL = 'http://localhost:5000';
+
+    var E = window.wangEditor;
+    var editor = new E('#toolbar','#text');
+    editor.customConfig.uploadImgServer = serverURL + '/upload';
+    editor.customConfig.uploadFileName = 'files';
+    editor.create();
+
+    var header = new Vue({
+        el: '#header',
+        data: {
+            url: '',
+            preTitle: '',
+            title: '',
+            afterTitle: '',
+            content: '',
+            summary: ''
+        },
+        methods: {
+            crawlArt: function () {
+                if (header.url.indexOf('http') < 0) {
+                    alert("请输入正确的文章地址！")
+                } else {
+                    $.ajax({
+                        url: serverURL +'/crawl?type=auto&url='+this.url,
+                        type: 'get',
+                        success: function (res) {
+                            console.log(res);
+                            res = eval('(' + res + ')');
+                            header.title = res.title;
+                            editor.txt.html(res.content_html)
+                        }
+                    })
+                }
+            }
+        }
+    });
+    var footer = new Vue({
+        el: '#footer',
+        data: {
+            remarks: '',
+            Art: ''
+        },
+        methods: {
+            previewArt: function () {
+                if (header.url.indexOf('http') < 0){
+                    alert("请输入正确的文章地址！")
+                } else if(header.title.length < 1){
+                    alert("标题不能为空！")
+                } else {
+                    footer.Art = '图片下载中......';
+                    $.ajax({
+                        url: serverURL +'/get_content_text',
+                        method: 'post',
+                        data: {
+                            url: header.url,
+                            html: editor.txt.html(),
+                        },
+                        success: function (res) {
+                            console.log(res);
+                            footer.Art =
+                                '###文章地址###\n' + header.url +
+                                '\n###前置副标题###\n' + header.preTitle +
+                                '\n###标题###\n' + header.title +
+                                '\n###后置副标题###\n' + header.afterTitle +
+                                '\n###摘要###\n' + header.summary +
+                                '\n###正文###\n' + res +
+                                '\n###注释###\n' + footer.remarks;
+                            right.contentLine = res.split("\n");
+                            right.showSubmit = true;
+                        }
+                    })
+                }
+            }
+        }
+    });
+    var right = new Vue({
+        el: '#right',
+        data: {
+            showSubmit: false,
+            contentLine: ''
+        },
+        methods: {
+            submitArt: function () {
+                $.ajax({
+                    url: serverURL + '/submitArt',
+                    method: 'post',
+                    data: { url: header.url },
+                    success:function (res) {
+                        console.log(res);
+                        if (res.code === 0){
+                            alert("提交成功！")
+                        } else if(res.code === -1){
+                            alert(res.msg)
+                        }
+                    }
+                })
+            }
+        }
+    })
+</script>
+</body>
+
+</html>
